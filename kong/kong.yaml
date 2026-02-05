@@ -1,0 +1,55 @@
+_format_version: "3.0"
+
+# Global plugins (applied to all routes)
+plugins:
+  - name: request-enrichment  # Custom Lua plugin for header injection and logging
+    config:
+      add_security_headers: true
+      log_request_body: false
+      custom_header_prefix: "X-Kong"
+
+services:
+  - name: user-service
+    url: http://user-service.assignment-4.svc.cluster.local:80
+    routes:
+    - name: public-routes
+      paths:
+      - /health
+      - /verify
+      - /login
+      strip_path: false
+    - name: secure-routes
+      paths:
+      - /secure
+      - /users
+      strip_path: false
+      plugins:
+      - name: jwt
+        # config: 
+        #   key_claim_name: kid
+      - name: rate-limiting
+        config: 
+          minute: 10
+          limit_by: ip
+          policy: local
+      - name: request-size-limiting  # DDoS: Prevent large payload attacks
+        config:
+          allowed_payload_size: 10  # 10 MB max
+      - name: ip-restriction
+        config:
+           allow: 
+             - 0.0.0.0/0 # Open for Evaluation/Testing convenience. (In prod: use specific CIDR)
+             # - 10.0.0.0/8
+      - name: bot-detection  # DDoS: Block common attack patterns
+        config:
+          allow: []
+          deny: 
+            - "bot"
+            - "crawler"
+            - "scanner"
+
+consumers:
+  - username: admin
+    jwt_secrets:
+      - key: "assignment-issuer"
+        secret: "super-secret-key"

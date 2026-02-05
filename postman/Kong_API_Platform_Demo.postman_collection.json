@@ -1,0 +1,364 @@
+{
+	"info": {
+		"_postman_id": "kong-api-platform-demo",
+		"name": "Kong API Platform Demo",
+		"description": "AI-Native DevOps Assignment 4: Secure API Platform with Kong Gateway + ModSecurity",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "1. Public Endpoints (No Auth)",
+			"item": [
+				{
+					"name": "Health Check",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/health",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"health"
+							]
+						},
+						"description": "Public health check endpoint - No JWT required"
+					},
+					"response": []
+				},
+				{
+					"name": "Verify Token Endpoint",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/verify",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"verify"
+							]
+						},
+						"description": "Public token verification endpoint - No JWT required"
+					},
+					"response": []
+				}
+			],
+			"description": "Endpoints that bypass JWT authentication"
+		},
+		{
+			"name": "2. Authentication",
+			"item": [
+				{
+					"name": "Login (Get JWT Token)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Login successful\", function() {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Token received\", function() {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('access_token');",
+									"    ",
+									"    // Save token to environment",
+									"    pm.environment.set(\"jwt_token\", jsonData.access_token);",
+									"    console.log(\"JWT Token saved: \" + jsonData.access_token.substring(0, 20) + \"...\");",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/x-www-form-urlencoded",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "urlencoded",
+							"urlencoded": [
+								{
+									"key": "username",
+									"value": "admin",
+									"type": "text"
+								},
+								{
+									"key": "password",
+									"value": "password123",
+									"type": "text"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}/login",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"login"
+							]
+						},
+						"description": "Authenticate and receive JWT token. Token is automatically saved to environment."
+					},
+					"response": []
+				}
+			],
+			"description": "Authentication endpoints"
+		},
+		{
+			"name": "3. Protected Endpoints (JWT Required)",
+			"item": [
+				{
+					"name": "Get Users (Without Token) - Should Fail",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/users",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"users"
+							]
+						},
+						"description": "Attempt to access protected endpoint without JWT - Expect 401"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Users (With Token) - Should Success",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{jwt_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/users",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"users"
+							]
+						},
+						"description": "Access protected endpoint with JWT token - Expect 200"
+					},
+					"response": []
+				},
+				{
+					"name": "Secure Endpoint (With Token)",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{jwt_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/secure",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"secure"
+							]
+						},
+						"description": "Another protected endpoint demonstrating JWT enforcement"
+					},
+					"response": []
+				}
+			],
+			"description": "Endpoints that require JWT authentication"
+		},
+		{
+			"name": "4. Rate Limiting Test",
+			"item": [
+				{
+					"name": "Rate Limit Test - Request 1-12",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{jwt_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/users",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"users"
+							]
+						},
+						"description": "Click Send 12 times rapidly. First 10 requests: 200 OK. Requests 11-12: 429 Too Many Requests"
+					},
+					"response": []
+				}
+			],
+			"description": "Test rate limiting: 10 requests/minute limit"
+		},
+		{
+			"name": "5. DDoS Protection - Attack Tests",
+			"item": [
+				{
+					"name": "XSS Attack (Should Block - 403)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/health?test=<script>alert('xss')</script>",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"health"
+							],
+							"query": [
+								{
+									"key": "test",
+									"value": "<script>alert('xss')</script>",
+									"description": "XSS payload"
+								}
+							]
+						},
+						"description": "ModSecurity should block this XSS attempt with 403 Forbidden"
+					},
+					"response": []
+				},
+				{
+					"name": "SQL Injection (Should Block - 403)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/health?id=1' OR '1'='1",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"health"
+							],
+							"query": [
+								{
+									"key": "id",
+									"value": "1' OR '1'='1",
+									"description": "SQL injection payload"
+								}
+							]
+						},
+						"description": "ModSecurity should block this SQL injection with 403 Forbidden"
+					},
+					"response": []
+				},
+				{
+					"name": "Path Traversal (Should Block - 403)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/health?file=../../etc/passwd",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"health"
+							],
+							"query": [
+								{
+									"key": "file",
+									"value": "../../etc/passwd",
+									"description": "Path traversal payload"
+								}
+							]
+						},
+						"description": "ModSecurity should block this path traversal with 403 Forbidden"
+					},
+					"response": []
+				},
+				{
+					"name": "Command Injection (Should Block - 403)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/health?cmd=;cat /etc/passwd",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"health"
+							],
+							"query": [
+								{
+									"key": "cmd",
+									"value": ";cat /etc/passwd",
+									"description": "Command injection payload"
+								}
+							]
+						},
+						"description": "ModSecurity should block this command injection with 403 Forbidden"
+					},
+					"response": []
+				},
+				{
+					"name": "Legitimate Request (Should Pass - 200)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/health",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"health"
+							]
+						},
+						"description": "Normal request should work fine after attacks - 200 OK"
+					},
+					"response": []
+				}
+			],
+			"description": "Test ModSecurity WAF blocking attacks"
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://127.0.0.1",
+			"type": "string"
+		}
+	]
+}
